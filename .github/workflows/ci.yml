@@ -9,6 +9,10 @@ jobs:
   ci:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: agentic-platform   # 🔥 IMPORTANT
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -23,10 +27,8 @@ jobs:
           pip install -r requirements.txt
           pip install flake8 pytest
 
-      - name: Run Lint (flake8)
-        run: |
-          flake8 .
+      - name: Run Lint
+        run: flake8 .
 
-      - name: Run Tests (pytest)
-        run: |
-          pytest
+      - name: Run Tests
+        run: pytest
