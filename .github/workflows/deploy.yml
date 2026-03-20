@@ -1,50 +1,65 @@
-name: Deploy to EKS
+name: Deploy AI Agent
 
 on:
   push:
     branches:
       - main
 
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: ai-agent
+  EKS_CLUSTER: ai-agent-cluster
+  AWS_ACCOUNT_ID: 416573464919
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    # 🔥 FIX: your code is inside agentic-platform
     defaults:
       run:
         working-directory: agentic-platform
 
     steps:
+      # ✅ Checkout repo
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # ✅ AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
 
+      # ✅ Login to ECR
       - name: Login to ECR
         run: |
-          aws ecr get-login-password --region us-east-1 | \
-          docker login --username AWS --password-stdin 416573464919.dkr.ecr.us-east-1.amazonaws.com
+          aws ecr get-login-password --region $AWS_REGION | \
+          docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
+      # 🔥 FIX: correct Dockerfile path
       - name: Build Docker image
         run: |
-          docker build -t ai-agent -f docker/Dockerfile .
+          docker build -t $ECR_REPOSITORY -f docker/Dockerfile .
 
+      # ✅ Tag image
       - name: Tag image
         run: |
-          docker tag ai-agent:latest 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:latest
+          docker tag $ECR_REPOSITORY:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
+      # ✅ Push image
       - name: Push to ECR
         run: |
-          docker push 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:latest
+          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
+      # ✅ Update kubeconfig
       - name: Update kubeconfig
         run: |
-          aws eks update-kubeconfig --region us-east-1 --name ai-agent-cluster
+          aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
 
+      # ✅ Deploy to EKS
       - name: Deploy to EKS
         run: |
           kubectl apply -f k8s/
