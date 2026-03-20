@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-agent
+  labels:
+    app: ai-agent
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-agent
+  template:
+    metadata:
+      labels:
+        app: ai-agent
+    spec:
+      containers:
+      - name: ai-agent
+        image: 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:latest   # 🔥 FIXED
+        imagePullPolicy: Always
+
+        ports:
+        - containerPort: 8000
+
+        env:
+        - name: REDIS_HOST
+          value: redis
+
+        - name: SNOWFLAKE_ACCOUNT
+          valueFrom:
+            secretKeyRef:
+              name: snowflake-secret
+              key: account
+
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"

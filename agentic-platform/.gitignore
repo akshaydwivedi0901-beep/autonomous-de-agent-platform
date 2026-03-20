@@ -1,0 +1,17 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# AWS
+awscliv2.zip
+
+# Python
+__pycache__/
+*.pyc
+
+# Env
+.env
+
+# Misc
+*.log

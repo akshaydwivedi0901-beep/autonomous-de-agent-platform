@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pydantic
+snowflake-connector-python
+langgraph
+langchain
+langchain-groq
+python-dotenv
+chromadb
+langchain-community
+sentence-transformers
+redis
+sse-starlette
+prometheus-client
+httpx

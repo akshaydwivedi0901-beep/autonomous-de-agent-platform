@@ -1,0 +1,45 @@
+name: CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+
+  deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+        aws-region: us-east-1
+
+    - name: Login to ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build Docker image
+      run: |
+        docker build -t ai-agent .
+
+    - name: Tag image
+      run: |
+        docker tag ai-agent:latest ${{ steps.login-ecr.outputs.registry }}/ai-agent:latest
+
+    - name: Push to ECR
+      run: |
+        docker push ${{ steps.login-ecr.outputs.registry }}/ai-agent:latest
+
+    - name: Deploy to EKS
+      run: |
+        aws eks update-kubeconfig --region us-east-1 --name ai-agent-cluster
+        kubectl apply -f k8s/deployment.yaml
+        kubectl apply -f k8s/service.yaml
