@@ -4,6 +4,7 @@ import snowflake.connector
 import time
 from app.core.config import Settings
 
+
 class SnowflakeService:
 
     def _connect(self):

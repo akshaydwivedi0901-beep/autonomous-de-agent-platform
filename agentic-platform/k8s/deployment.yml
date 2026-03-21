@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: ai-agent
-        image: 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:latest   # 🔥 FIXED
+        image: 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:latest
         imagePullPolicy: Always
 
         ports:
@@ -31,6 +31,24 @@ spec:
             secretKeyRef:
               name: snowflake-secret
               key: account
+
+        # 🔥 NEW: Liveness Probe (restart if dead)
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
+
+        # 🔥 NEW: Readiness Probe (traffic control)
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          failureThreshold: 3
 
         resources:
           requests:

@@ -14,6 +14,7 @@ env:
 
 jobs:
   deploy:
+    needs: ci   # 🔥 CRITICAL FIX (CI must pass first)
     runs-on: ubuntu-latest
 
     defaults:
@@ -21,15 +22,12 @@ jobs:
         working-directory: agentic-platform
 
     steps:
-      # ✅ Checkout
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ✅ Set image tag (commit SHA)
       - name: Set Image Tag
         run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
 
-      # ✅ AWS Credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -37,40 +35,37 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # ✅ Login to ECR
       - name: Login to ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | \
           docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      # ✅ Build Docker Image
       - name: Build Docker image
         run: |
           docker build -t $ECR_REPOSITORY:$IMAGE_TAG -f docker/Dockerfile .
 
-      # ✅ Tag Image with SHA
       - name: Tag image
         run: |
           docker tag $ECR_REPOSITORY:$IMAGE_TAG \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # ✅ Push Image
       - name: Push to ECR
         run: |
           docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # ✅ Update kubeconfig
       - name: Update kubeconfig
         run: |
           aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
 
-      # ✅ Update Deployment Image (NO latest anymore)
       - name: Update Deployment Image
         run: |
           kubectl set image deployment/$DEPLOYMENT_NAME \
           $DEPLOYMENT_NAME=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # ✅ Verify rollout (CRITICAL)
       - name: Verify Rollout
         run: |
           kubectl rollout status deployment/$DEPLOYMENT_NAME
+
+      # Optional but useful
+      - name: Check Pods
+        run: kubectl get pods -l app=ai-agent

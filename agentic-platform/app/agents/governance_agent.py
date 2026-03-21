@@ -5,6 +5,7 @@ from app.core.policies import ENV_POLICIES, FORBIDDEN_KEYWORDS, RESTRICTED_COLUM
 
 logger = logging.getLogger(__name__)
 
+
 def governance_agent(state):
 
     sql = (state.generated_sql or "").upper()

@@ -20,6 +20,7 @@ class QueryResponse(BaseModel):
     rows: Optional[int] = None
     status: str
 
+
 class QueryRequest(BaseModel):
     question: str
     session_id: str

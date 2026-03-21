@@ -1,6 +1,7 @@
 import snowflake.connector
 from app.core.config import Settings
 
+
 class SchemaService:
 
     def get_schema_metadata(self):

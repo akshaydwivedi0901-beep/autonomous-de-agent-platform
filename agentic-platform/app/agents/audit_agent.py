@@ -5,6 +5,7 @@ from app.services.snowflake_service import SnowflakeService
 
 logger = logging.getLogger(__name__)
 
+
 def audit_agent(state):
 
     service = SnowflakeService()

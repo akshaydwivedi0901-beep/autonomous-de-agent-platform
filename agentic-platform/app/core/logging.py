@@ -1,6 +1,7 @@
 import logging
 import json
 
+
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         return json.dumps({
@@ -8,6 +9,7 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
             "module": record.module
         })
+
 
 def setup_logging():
     handler = logging.StreamHandler()
