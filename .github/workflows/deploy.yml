@@ -74,7 +74,7 @@ jobs:
       - name: Apply Kubernetes manifests
         run: |
           kubectl apply -f k8s/deployment.yml
-          kubectl apply -f k8s/service.yml
+          kubectl apply -f k8s/service.yaml
 
       # ✅ Update deployment image
       - name: Update Deployment Image
