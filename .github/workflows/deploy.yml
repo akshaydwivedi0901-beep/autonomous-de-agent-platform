@@ -25,11 +25,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ✅ Unique image tag
+      # ✅ Generate unique image tag (commit SHA)
       - name: Set Image Tag
         run: echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
 
-      # ✅ AWS Auth
+      # ✅ Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -41,12 +41,15 @@ jobs:
       - name: Login to ECR
         run: |
           aws ecr get-login-password --region $AWS_REGION | \
-          docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+          docker login --username AWS --password-stdin \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
       # ✅ Build Docker image
       - name: Build Docker image
         run: |
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG -f docker/Dockerfile .
+          docker build \
+            -t $ECR_REPOSITORY:$IMAGE_TAG \
+            -f docker/Dockerfile .
 
       # ✅ Tag image for ECR
       - name: Tag image
@@ -54,28 +57,50 @@ jobs:
           docker tag $ECR_REPOSITORY:$IMAGE_TAG \
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # ✅ Push to ECR
+      # ✅ Push image to ECR
       - name: Push to ECR
         run: |
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # ✅ Configure kubectl
+      # ✅ Update kubeconfig
       - name: Update kubeconfig
         run: |
-          aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER
+          aws eks update-kubeconfig \
+          --region $AWS_REGION \
+          --name $EKS_CLUSTER
 
-      # ✅ Update deployment with new image
+      # ✅ Deploy new image
       - name: Update Deployment Image
         run: |
           kubectl set image deployment/$DEPLOYMENT_NAME \
           $DEPLOYMENT_NAME=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-      # ✅ Wait for rollout
+      # ✅ Wait for rollout (FAIL if not successful)
       - name: Verify Rollout
         run: |
-          kubectl rollout status deployment/$DEPLOYMENT_NAME
+          kubectl rollout status deployment/$DEPLOYMENT_NAME --timeout=120s
 
-      # ✅ Debug pods
-      - name: Check Pods
+      # 🔥 Debug automatically if something fails
+      - name: Debug on failure
+        if: failure()
         run: |
+          echo "===== POD STATUS ====="
           kubectl get pods -l app=ai-agent
+
+          echo "===== DESCRIBE POD ====="
+          kubectl describe pods -l app=ai-agent
+
+          echo "===== LOGS ====="
+          kubectl logs -l app=ai-agent --tail=100 || true
+
+      # 🔥 Optional: Auto rollback (VERY POWERFUL)
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          kubectl rollout undo deployment/$DEPLOYMENT_NAME
+
+      # ✅ Success message
+      - name: Deployment Success
+        if: success()
+        run: echo "🚀 Deployment completed successfully!"

@@ -14,27 +14,23 @@ jobs:
         working-directory: agentic-platform
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install minimal dependencies
+      - name: Install dependencies
         run: |
+          pip install -r requirements.txt
           pip install flake8 pytest
 
-      # 🔥 FIX: DO NOT FAIL PIPELINE ON LINT
-      - name: Run Lint (non-blocking)
+      # 🔥 NOW FAIL IF BAD CODE
+      - name: Lint (blocking)
         run: |
-          flake8 . --ignore=E302,W292 || true
+          flake8 .
 
-      # 🔥 FIX: TEMP SKIP TESTS
-      - name: Run Tests (skip for now)
+      # 🔥 ADD REAL TESTS (even basic)
+      - name: Run Tests
         run: |
-          echo "Skipping tests"
-
-      - name: CI Success
-        run: echo "CI Passed 🚀"
+          pytest
