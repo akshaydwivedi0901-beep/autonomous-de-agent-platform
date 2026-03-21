@@ -1,8 +1,9 @@
-# app/services/snowflake_service.py
-
 import snowflake.connector
 import time
+import logging
 from app.core.config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class SnowflakeService:
@@ -24,7 +25,8 @@ class SnowflakeService:
 
             try:
                 rows = cursor.fetchall()
-            except:
+            except Exception as e:
+                logger.warning(f"No rows returned or fetch failed: {e}")
                 rows = []
 
             query_id = cursor.sfqid
