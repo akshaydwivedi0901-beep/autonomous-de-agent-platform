@@ -1,7 +1,7 @@
 # app/rag/retriever.py
 
 from app.rag.vector_store import get_vector_store
-from app.core.config import settings
+
 
 
 def retrieve_context(query: str, k: int = 4):

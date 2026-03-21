@@ -2,20 +2,20 @@ import logging
 from fastapi import APIRouter, HTTPException
 
 from app.state.agent_state import AgentState
-from app.orchestrator.graph import build_graph
 from app.api.models import QueryRequest, QueryResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-graph = build_graph()
-
 
 @router.post("/execute", response_model=QueryResponse)
 async def execute(request: QueryRequest):
-
     try:
+        # ✅ Lazy import to avoid circular dependency
+        from app.orchestrator.graph import build_graph
+
+        graph = build_graph()
 
         state = AgentState(
             question=request.question,
@@ -33,7 +33,6 @@ async def execute(request: QueryRequest):
         )
 
     except Exception as e:
-
         logger.exception("Agent execution failed")
 
         raise HTTPException(

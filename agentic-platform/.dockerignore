@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.env
+.git
+.gitignore
+tests/
+terraform/
+chroma_db/
+*.sqlite3
+*.bin
+*.pt
+*.onnx

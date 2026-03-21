@@ -1,5 +1,3 @@
-"""API models (pydantic)"""
-
 from pydantic import BaseModel
 from typing import Optional
 
@@ -11,6 +9,7 @@ class HealthResponse(BaseModel):
 class QueryRequest(BaseModel):
     question: str
     environment: Optional[str] = "dev"
+    session_id: Optional[str] = None
 
 
 class QueryResponse(BaseModel):
@@ -19,8 +18,3 @@ class QueryResponse(BaseModel):
     sql: Optional[str] = None
     rows: Optional[int] = None
     status: str
-
-
-class QueryRequest(BaseModel):
-    question: str
-    session_id: str

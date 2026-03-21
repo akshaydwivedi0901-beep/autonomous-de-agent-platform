@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: ai-agent
-        image: 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:latest
+        image: 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:v9
         imagePullPolicy: Always
 
         ports:

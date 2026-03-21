@@ -3,7 +3,7 @@ from langgraph.graph import StateGraph, END
 from app.state.agent_state import AgentState
 
 from app.agents.ba_agent import ba_agent
-from app.agents.router_agent import router_agent
+from app.agents.router_agent import router as router_agent
 from app.agents.rag_agent import rag_agent
 from app.agents.sql_agent import sql_agent
 from app.agents.validator_agent import validator_agent

@@ -1,8 +1,8 @@
-import uuid
+
 import logging
 
 from fastapi import APIRouter
-from app.api.router import router as execute_router
+
 from app.api.chat_api import router as chat_router
 from app.api.health_api import router as health_router
 from app.api.metrics_api import router as metrics_router
@@ -16,7 +16,7 @@ from app.memory.redis_memory import RedisMemory
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-router.include_router(execute_router)
+
 router.include_router(chat_router)
 router.include_router(health_router)
 router.include_router(metrics_router)
