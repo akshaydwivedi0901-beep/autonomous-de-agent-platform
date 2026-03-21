@@ -1,15 +1,32 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Logs
 *.log
+
+# Env
 .env
+
+# Git
 .git
 .gitignore
+.github
+
+# Tests & Dev
 tests/
 terraform/
+
+# Local data / DB
 chroma_db/
 *.sqlite3
+
+# ML / embeddings (VERY IMPORTANT)
 *.bin
 *.pt
 *.onnx
+
+# OS / misc
+.DS_Store
