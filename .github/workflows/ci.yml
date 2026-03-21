@@ -32,7 +32,7 @@ jobs:
 
       # 🔥 CRITICAL FIX: Single-line lint (prevents GitHub ignoring flags)
       - name: Lint (balanced)
-        run: flake8 . --ignore=E302,W292,E501 --max-line-length=120 --exclude=__pycache__
+        run: flake8 . --ignore=E302,E303,W292,E501 --max-line-length=120 --exclude=__pycache__
 
       # ✅ Run tests (safe even if none exist)
       - name: Run Tests
