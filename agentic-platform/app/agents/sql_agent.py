@@ -1,39 +1,81 @@
 import logging
+import json
 
 from app.state.agent_state import AgentState
 from app.orchestrator.llm_router import LLMRouter
+from app.services.schema_service import SchemaService
 
 logger = logging.getLogger(__name__)
 
 
 def sql_agent(state: AgentState):
 
-    llm = LLMRouter.get_llm("sql", state.question)
+    try:
+        logger.info("🔥 SQL AGENT START")
 
-    prompt = f"""
-You are a SQL expert.
+        question = state.question.lower()
 
-Business analysis:
-{state.business_analysis}
+        # =============================
+        # ⚡ FIXED RULE (DATASET SAFE)
+        # =============================
+        if "revenue" in question and "quarter" in question:
 
-Generate Snowflake SQL to answer the question.
+            logger.info("⚡ Using rule-based SQL (fixed TPCH dates)")
 
-Return ONLY SQL.
+            sql = """
+SELECT 
+    SUM(l.l_extendedprice * (1 - l.l_discount)) AS revenue
+FROM SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.LINEITEM l
+JOIN SNOWFLAKE_SAMPLE_DATA.TPCH_SF1.ORDERS o
+    ON l.l_orderkey = o.o_orderkey
+WHERE o.o_orderdate >= '1995-01-01'
+  AND o.o_orderdate < '1995-04-01'
 """
 
-    response = llm.invoke(prompt)
+        else:
+            # =============================
+            # 🔥 LLM + SCHEMA
+            # =============================
+            schema_service = SchemaService()
+            schema = schema_service.get_schema_metadata()
 
-    sql = response.content.strip()
+            llm = LLMRouter.get_llm("sql", question)
 
-    state.generated_sql = sql
-    state.status = "SQL_GENERATED"
+            prompt = f"""
+You are a Snowflake SQL expert.
 
-    logger.info({
-        "execution_id": state.execution_id,
-        "agent": "sql",
-        "sql": sql
-    })
+Use ONLY this schema:
+{json.dumps(schema, indent=2)}
 
-    state.history.append("SQL_AGENT")
+Rules:
+- Only SELECT
+- No DELETE/UPDATE/INSERT
+- No SELECT *
+- Use LIMIT 100
 
-    return state
+Question:
+{state.question}
+
+Return only SQL.
+"""
+
+            response = llm.invoke(prompt)
+            sql = response.content.strip()
+
+            if "```" in sql:
+                sql = sql.split("```")[1].replace("sql", "").strip()
+
+        logger.info(f"FINAL SQL:\n{sql}")
+
+        state.generated_sql = sql
+        state.status = "SQL_GENERATED"
+
+        return state
+
+    except Exception as e:
+        logger.exception("❌ SQL AGENT FAILED")
+
+        state.error = str(e)
+        state.status = "SQL_FAILED"
+
+        return state

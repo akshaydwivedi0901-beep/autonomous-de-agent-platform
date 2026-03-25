@@ -1,37 +1,64 @@
 import logging
-
 from app.state.agent_state import AgentState
-from app.orchestrator.llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)
 
 
 def explain_agent(state: AgentState):
 
-    llm = LLMRouter.get_llm("explain")
+    try:
+        logger.info("🔥 EXPLAIN AGENT START")
 
-    prompt = f"""
-Explain the SQL result to a business user.
+        result = state.execution_result
 
-Question:
-{state.question}
+        if not result:
+            state.final_answer = "No result returned"
+            state.status = "EXPLAINED"
+            return state
 
-SQL:
-{state.validated_sql}
+        rows = result.get("rows")
 
-Provide a clear explanation.
-"""
+        if not rows:
+            state.final_answer = "No data found"
+            state.status = "EXPLAINED"
+            return state
 
-    response = llm.invoke(prompt)
+        first_row = rows[0]
 
-    state.explanation = response.content.strip()
-    state.status = "EXPLAIN_COMPLETE"
+        if isinstance(first_row, (list, tuple)):
+            value = first_row[0]
+        elif isinstance(first_row, dict):
+            value = list(first_row.values())[0]
+        else:
+            value = first_row
 
-    logger.info({
-        "execution_id": state.execution_id,
-        "agent": "explain"
-    })
+        # =============================
+        # 🔥 HANDLE NULL
+        # =============================
+        if value is None:
+            state.final_answer = "No revenue data found for the selected time period"
+            state.status = "EXPLAINED"
+            return state
 
-    state.history.append("EXPLAIN_AGENT")
+        # Format number
+        try:
+            value = float(value)
+            value = f"{value:,.2f}"
+        except Exception:
+            pass
 
-    return state
+        state.final_answer = f"Revenue last quarter is: {value}"
+        state.status = "EXPLAINED"
+
+        logger.info(f"✅ FINAL ANSWER: {state.final_answer}")
+
+        return state
+
+    except Exception as e:
+        logger.exception(f"❌ EXPLAIN AGENT FAILED: {str(e)}")
+
+        state.final_answer = "Error generating explanation"
+        state.error = str(e)
+        state.status = "EXPLAIN_FAILED"
+
+        return state

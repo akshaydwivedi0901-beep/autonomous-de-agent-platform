@@ -1,41 +1,51 @@
-# app/agents/executor_agent.py
-
-from app.services.snowflake_service import SnowflakeService
 import logging
+from app.services.snowflake_service import SnowflakeService
+from app.state.agent_state import AgentState
 
 logger = logging.getLogger(__name__)
 
 
-def executor_agent(state):
-    service = SnowflakeService()
+def executor_agent(state: AgentState):
 
     try:
-        result = service.execute(state.generated_sql)
+        logger.info("🔥 EXECUTOR AGENT START")
 
-        state.query_id = result["query_id"]
-        state.row_count = result["row_count"]
-        state.execution_time = result["execution_time"]
+        # =============================
+        # ✅ USE VALIDATED SQL (CRITICAL FIX)
+        # =============================
+        sql = state.validated_sql or state.generated_sql
+
+        if not sql:
+            raise ValueError("No SQL available for execution")
+
+        logger.info(f"Executing SQL:\n{sql}")
+
+        # =============================
+        # ✅ EXECUTE
+        # =============================
+        service = SnowflakeService()
+        result = service.execute(sql)
+
+        # =============================
+        # ✅ STORE RESULT (SAFE)
+        # =============================
+        state.execution_result = result
+
+        # Optional breakdown
+        state.rows = result.get("rows")
+        state.row_count = result.get("row_count")
+        state.execution_time = result.get("execution_time")
+
         state.status = "EXECUTED"
 
-        # ✅ Add telemetry here
-        logger.info({
-            "execution_id": state.execution_id,
-            "agent": "executor",
-            "query_id": state.query_id,
-            "row_count": state.row_count,
-            "execution_time": state.execution_time,
-            "status": state.status
-        })
+        logger.info(f"✅ EXECUTION SUCCESS: rows={state.row_count}")
+
+        return state
 
     except Exception as e:
+        logger.exception(f"❌ EXECUTOR AGENT FAILED: {str(e)}")
+
         state.error = str(e)
-        state.status = "FAILED"
+        state.status = "EXECUTION_FAILED"
 
-        logger.error({
-            "execution_id": state.execution_id,
-            "agent": "executor",
-            "error": state.error,
-            "status": state.status
-        })
-
-    return state
+        return state

@@ -1,55 +1,129 @@
 import logging
+import re
 
 from app.state.agent_state import AgentState
-from app.orchestrator.llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)
 
 
+# =========================================
+# 🔥 CONFIG
+# =========================================
+ALLOWED_TABLES = {
+    "CUSTOMER", "ORDERS", "LINEITEM",
+    "PART", "SUPPLIER", "REGION", "NATION"
+}
+
+FORBIDDEN_KEYWORDS = [
+    "DROP", "DELETE", "TRUNCATE",
+    "UPDATE", "INSERT", "ALTER"
+]
+
+
+# =========================================
+# 🔥 HELPERS
+# =========================================
+def contains_forbidden(sql: str) -> bool:
+    sql_upper = sql.upper()
+    return any(k in sql_upper for k in FORBIDDEN_KEYWORDS)
+
+
+def is_select_query(sql: str) -> bool:
+    sql_upper = sql.strip().upper()
+    return sql_upper.startswith("SELECT") or sql_upper.startswith("WITH")
+
+
+def contains_allowed_table(sql: str) -> bool:
+    sql_upper = sql.upper()
+    return any(table in sql_upper for table in ALLOWED_TABLES)
+
+
+def has_select_star(sql: str) -> bool:
+    return "SELECT *" in sql.upper()
+
+
+def enforce_limit(sql: str) -> str:
+    if "LIMIT" not in sql.upper():
+        return sql.strip() + "\nLIMIT 100"
+    return sql
+
+
+# =========================================
+# 🔥 MAIN VALIDATOR
+# =========================================
 def validator_agent(state: AgentState):
 
-    llm = LLMRouter.get_llm("validator")
+    try:
+        logger.info("🔥 VALIDATOR START")
 
-    prompt = f"""
-You are a SQL validation expert.
+        sql = state.generated_sql
 
-Question:
-{state.question}
+        # =============================
+        # Basic checks
+        # =============================
+        if not sql or not sql.strip():
+            raise ValueError("No SQL generated")
 
-SQL:
-{state.generated_sql}
+        sql = sql.strip()
+        sql_upper = sql.upper()
 
-Check:
-- valid tables
-- valid columns
-- logical joins
-- no destructive operations
+        # =============================
+        # 🚫 Dangerous SQL
+        # =============================
+        if contains_forbidden(sql):
+            state.validation_status = "INVALID"
+            state.status = "INVALID_SQL"
+            state.error = "Dangerous SQL detected"
+            return state
 
-Respond only with:
+        # =============================
+        # ✅ Must be SELECT
+        # =============================
+        if not is_select_query(sql):
+            state.validation_status = "INVALID"
+            state.status = "INVALID_SQL"
+            state.error = "Only SELECT queries allowed"
+            return state
 
-VALID
-or
-INVALID
-"""
+        # =============================
+        # ✅ Must use known tables
+        # =============================
+        if not contains_allowed_table(sql):
+            state.validation_status = "INVALID"
+            state.status = "INVALID_SQL"
+            state.error = "No allowed table used"
+            return state
 
-    response = llm.invoke(prompt)
+        # =============================
+        # 🚫 No SELECT *
+        # =============================
+        if has_select_star(sql):
+            state.validation_status = "INVALID"
+            state.status = "INVALID_SQL"
+            state.error = "SELECT * is not allowed"
+            return state
 
-    decision = response.content.strip().upper()
+        # =============================
+        # 💰 Cost control
+        # =============================
+        sql = enforce_limit(sql)
 
-    if "INVALID" in decision:
-        state.validation_status = "INVALID"
-        state.status = "INVALID_SQL"
-    else:
+        # =============================
+        # ✅ SUCCESS
+        # =============================
         state.validation_status = "VALID"
-        state.validated_sql = state.generated_sql
+        state.validated_sql = sql
         state.status = "VALID_SQL"
 
-    logger.info({
-        "execution_id": state.execution_id,
-        "agent": "validator",
-        "validation_status": state.validation_status
-    })
+        logger.info("✅ SQL VALIDATION PASSED")
 
-    state.history.append("VALIDATOR_AGENT")
+        return state
 
-    return state
+    except Exception as e:
+        logger.exception("❌ VALIDATOR FAILED")
+
+        state.validation_status = "INVALID"
+        state.status = "VALIDATOR_FAILED"
+        state.error = str(e)
+
+        return state
