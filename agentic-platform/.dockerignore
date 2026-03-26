@@ -14,6 +14,7 @@ __pycache__/
 .git
 .gitignore
 .github
+.vscode/
 
 # Tests & Dev
 tests/

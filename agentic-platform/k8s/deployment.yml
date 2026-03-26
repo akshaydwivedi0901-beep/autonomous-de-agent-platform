@@ -4,56 +4,114 @@ metadata:
   name: ai-agent
   labels:
     app: ai-agent
+
 spec:
-  replicas: 2
+  replicas: 1
+  revisionHistoryLimit: 1
+
+  strategy:
+    type: Recreate
+
   selector:
     matchLabels:
       app: ai-agent
+
   template:
     metadata:
       labels:
         app: ai-agent
+
     spec:
       containers:
-      - name: ai-agent
-        image: 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:v9
-        imagePullPolicy: Always
+        - name: ai-agent
+          image: 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:v321
+          imagePullPolicy: Always
 
-        ports:
-        - containerPort: 8000
+          ports:
+            - containerPort: 8000
 
-        env:
-        - name: REDIS_HOST
-          value: redis
+          env:
+            # =============================
+            # GROQ
+            # =============================
+            - name: GROQ_API_KEY
+              value: "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"
 
-        - name: SNOWFLAKE_ACCOUNT
-          valueFrom:
-            secretKeyRef:
-              name: snowflake-secret
-              key: account
+            # =============================
+            # SNOWFLAKE SECRETS
+            # =============================
+            - name: SNOWFLAKE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: snowflake-secret
+                  key: SNOWFLAKE_USER
 
-        # 🔥 NEW: Liveness Probe (restart if dead)
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          failureThreshold: 3
+            - name: SNOWFLAKE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: snowflake-secret
+                  key: SNOWFLAKE_PASSWORD
 
-        # 🔥 NEW: Readiness Probe (traffic control)
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          failureThreshold: 3
+            - name: SNOWFLAKE_ACCOUNT
+              valueFrom:
+                secretKeyRef:
+                  name: snowflake-secret
+                  key: SNOWFLAKE_ACCOUNT
 
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
+            - name: SNOWFLAKE_WAREHOUSE
+              valueFrom:
+                secretKeyRef:
+                  name: snowflake-secret
+                  key: SNOWFLAKE_WAREHOUSE
+
+            - name: SNOWFLAKE_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: snowflake-secret
+                  key: SNOWFLAKE_DATABASE
+
+            - name: SNOWFLAKE_SCHEMA
+              valueFrom:
+                secretKeyRef:
+                  name: snowflake-secret
+                  key: SNOWFLAKE_SCHEMA
+
+            - name: SNOWFLAKE_ROLE
+              valueFrom:
+                secretKeyRef:
+                  name: snowflake-secret
+                  key: SNOWFLAKE_ROLE
+
+            # =============================
+            # FLAGS
+            # =============================
+            - name: ENABLE_RAG
+              value: "false"
+
+          # =============================
+          # HEALTH CHECKS
+          # =============================
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          # =============================
+          # FREE TIER OPTIMIZED
+          # =============================
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "150m"

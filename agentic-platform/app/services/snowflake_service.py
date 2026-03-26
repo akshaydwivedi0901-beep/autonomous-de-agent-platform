@@ -11,31 +11,26 @@ class SnowflakeService:
     def _connect(self):
         return snowflake.connector.connect(**Settings.SNOWFLAKE_CONFIG)
 
-    def execute(self, sql: str, params=None):
+    def execute(self, sql: str):
         conn = self._connect()
         cursor = conn.cursor()
 
         try:
+            # ✅ SET CONTEXT
+            cursor.execute("USE DATABASE SNOWFLAKE_SAMPLE_DATA")
+            cursor.execute("USE SCHEMA TPCH_SF1")
+
             start = time.time()
 
-            if params:
-                cursor.execute(sql, params)
-            else:
-                cursor.execute(sql)
+            cursor.execute(sql)
+            rows = cursor.fetchall()
 
-            try:
-                rows = cursor.fetchall()
-            except Exception as e:
-                logger.warning(f"No rows returned or fetch failed: {e}")
-                rows = []
-
-            query_id = cursor.sfqid
             execution_time = time.time() - start
 
             return {
                 "rows": rows,
-                "query_id": query_id,
                 "row_count": len(rows),
+                "query_id": cursor.sfqid,
                 "execution_time": execution_time
             }
 

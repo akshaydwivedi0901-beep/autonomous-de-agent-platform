@@ -3,160 +3,74 @@ from langgraph.graph import StateGraph, END
 from app.state.agent_state import AgentState
 
 from app.agents.ba_agent import ba_agent
-from app.agents.router_agent import router as router_agent
-from app.agents.rag_agent import rag_agent
+from app.agents.router_agent import router_agent
 from app.agents.sql_agent import sql_agent
 from app.agents.validator_agent import validator_agent
-from app.agents.explain_agent import explain_agent
 from app.agents.executor_agent import executor_agent
 from app.agents.reflection_agent import reflection_agent
-from app.agents.audit_agent import audit_agent
+from app.agents.explain_agent import explain_agent
 
-
-MAX_RETRIES = 3
-
-
-# -------------------------
-# Router decision
-# -------------------------
-
-def route_after_router(state: AgentState):
-
-    if state.route == "RAG":
-        return "rag"
-
-    if state.route == "SQL":
-        return "sql"
-
-    # default fallback
-    return "sql"
-
-
-# -------------------------
-# Validation routing
-# -------------------------
-
-def route_after_validation(state: AgentState):
-
-    if state.validation_status == "INVALID":
-
-        if state.retry_count < MAX_RETRIES:
-            state.retry_count += 1
-            return "sql"
-
-        return "audit"
-
-    return "explain"
-
-
-# -------------------------
-# Explain routing
-# -------------------------
-
-def route_after_explain(state: AgentState):
-
-    if state.status == "EXPLAIN_FAILED":
-
-        if state.retry_count < MAX_RETRIES:
-            state.retry_count += 1
-            return "sql"
-
-        return "audit"
-
-    return "execute"
-
-
-# -------------------------
-# Reflection routing
-# -------------------------
-
-def route_after_reflection(state: AgentState):
-
-    if state.status == "REFLECTION_RETRY":
-
-        if state.retry_count < MAX_RETRIES:
-            state.retry_count += 1
-            return "sql"
-
-        return "audit"
-
-    return "audit"
-
-
-# -------------------------
-# Build Graph
-# -------------------------
 
 def build_graph():
 
     graph = StateGraph(AgentState)
 
     # Nodes
-    graph.add_node("ba", ba_agent)
-    graph.add_node("router", router_agent)
-    graph.add_node("rag", rag_agent)
+    graph.add_node("ba_agent", ba_agent)
+    graph.add_node("router_agent", router_agent)
+    graph.add_node("sql_agent", sql_agent)
+    graph.add_node("validator_agent", validator_agent)
+    graph.add_node("executor_agent", executor_agent)
+    graph.add_node("reflection_agent", reflection_agent)
+    graph.add_node("explain_agent", explain_agent)
 
-    graph.add_node("sql", sql_agent)
-    graph.add_node("validate", validator_agent)
-    graph.add_node("explain", explain_agent)
-    graph.add_node("execute", executor_agent)
-    graph.add_node("reflect", reflection_agent)
+    # Flow
+    graph.set_entry_point("ba_agent")
 
-    graph.add_node("audit", audit_agent)
+    graph.add_edge("ba_agent", "router_agent")
+    graph.add_edge("router_agent", "sql_agent")
+    graph.add_edge("sql_agent", "validator_agent")
+    graph.add_edge("validator_agent", "executor_agent")
 
-    # Entry
-    graph.set_entry_point("ba")
+    # Execution routing
+    def route_after_execution(state: AgentState):
+        if state.status == "EXECUTED":
+            return "explain_agent"
 
-    # Planner → Router
-    graph.add_edge("ba", "router")
+        if state.status == "FAILED":
+            return "reflection_agent"
 
-    # Router → Tool selection
+        return END
+
     graph.add_conditional_edges(
-        "router",
-        route_after_router,
+        "executor_agent",
+        route_after_execution,
         {
-            "rag": "rag",
-            "sql": "sql"
-        }
+            "explain_agent": "explain_agent",
+            "reflection_agent": "reflection_agent",
+            END: END,
+        },
     )
 
-    # RAG path
-    graph.add_edge("rag", "audit")
+    # Reflection routing (loop control)
+    def route_after_reflection(state: AgentState):
+        if state.retry_count >= state.max_retries:
+            return END
 
-    # SQL pipeline
-    graph.add_edge("sql", "validate")
+        if state.status == "RETRY":
+            return "sql_agent"
 
-    graph.add_conditional_edges(
-        "validate",
-        route_after_validation,
-        {
-            "sql": "sql",
-            "explain": "explain",
-            "audit": "audit"
-        }
-    )
+        return END
 
     graph.add_conditional_edges(
-        "explain",
-        route_after_explain,
-        {
-            "sql": "sql",
-            "execute": "execute",
-            "audit": "audit"
-        }
-    )
-
-    graph.add_edge("execute", "reflect")
-
-    graph.add_conditional_edges(
-        "reflect",
+        "reflection_agent",
         route_after_reflection,
         {
-            "sql": "sql",
-            "audit": "audit"
-        }
+            "sql_agent": "sql_agent",
+            END: END,
+        },
     )
 
-    graph.add_edge("audit", END)
+    graph.add_edge("explain_agent", END)
 
     return graph.compile()

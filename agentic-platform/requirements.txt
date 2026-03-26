@@ -11,6 +11,8 @@ langchain
 langchain-community
 langchain-groq
 langgraph
+sqlparse==0.5.0
+
 
 # Vector DB (light)
 chromadb

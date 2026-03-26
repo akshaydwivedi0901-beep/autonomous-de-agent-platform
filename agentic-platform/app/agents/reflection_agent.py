@@ -1,51 +1,27 @@
 import logging
-
 from app.state.agent_state import AgentState
-from app.orchestrator.llm_router import LLMRouter
 
 logger = logging.getLogger(__name__)
 
 
-def reflection_agent(state: AgentState):
+def reflection_agent(state: AgentState) -> AgentState:
+    logger.info("🔥 REFLECTION AGENT START")
 
-    llm = LLMRouter.get_llm("reflection")
+    # 🔥 STOP CONDITION (MOST IMPORTANT FIX)
+    if state.retry_count >= state.max_retries:
+        logger.error("❌ Max retries reached. Stopping loop.")
 
-    prompt = f"""
-You are reviewing the final answer.
+        state.final_answer = "❌ Failed to execute query after multiple attempts."
+        state.status = "FAILED"
 
-Question:
-{state.question}
+        return state
 
-SQL:
-{state.validated_sql}
+    # 🔥 increment retry
+    state.retry_count += 1
 
-Explanation:
-{state.explanation}
+    logger.warning(f"Retry attempt {state.retry_count}")
 
-Decide if the answer is correct.
-
-Return:
-
-VALID
-or
-RETRY
-"""
-
-    response = llm.invoke(prompt)
-
-    decision = response.content.strip().upper()
-
-    if "RETRY" in decision:
-        state.status = "REFLECTION_RETRY"
-    else:
-        state.status = "REFLECTION_OK"
-
-    logger.info({
-        "execution_id": state.execution_id,
-        "agent": "reflection",
-        "status": state.status
-    })
-
-    state.history.append("REFLECTION_AGENT")
+    # Send back to SQL
+    state.status = "RETRY"
 
     return state

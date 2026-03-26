@@ -42,15 +42,15 @@ app.include_router(health_router)
 async def startup_event():
 
     print("Starting Autonomous Agent Platform")
-
     print("Environment:", settings.ENVIRONMENT)
 
-    # Load RAG knowledge base
-    print("Loading RAG knowledge base...")
-
-    load_knowledge()
-
-    print("Knowledge loaded successfully")
+    # ✅ FIX: Only load RAG if enabled
+    if str(settings.ENABLE_RAG).lower() == "true":
+        print("Loading RAG knowledge base...")
+        load_knowledge()
+        print("Knowledge loaded successfully")
+    else:
+        print("RAG disabled — skipping knowledge load")
 
 
 # -----------------------------------

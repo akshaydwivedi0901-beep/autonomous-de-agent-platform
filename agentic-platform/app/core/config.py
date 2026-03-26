@@ -9,18 +9,18 @@ class Settings:
     # =============================
     # ENVIRONMENT
     # =============================
-
     ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 
     # =============================
-    # LLM CONFIG
+    # LLM CONFIG (FIXED 🚀)
     # =============================
 
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-    SMALL_MODEL = os.getenv("SMALL_MODEL", "llama3-8b-8192")
-    LARGE_MODEL = os.getenv("LARGE_MODEL", "mixtral-8x7b-32768")
-    DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llama3-8b-8192")
+    # ✅ Use ONLY supported models
+    SMALL_MODEL = os.getenv("SMALL_MODEL", "llama-3.1-8b-instant")
+    LARGE_MODEL = os.getenv("LARGE_MODEL", "llama-3.1-8b-instant")
+    DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "llama-3.1-8b-instant")
 
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", 2048))
 
@@ -30,7 +30,9 @@ class Settings:
 
     VECTOR_DB = os.getenv("VECTOR_DB", "chroma")
 
+    # Paths
     CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./chroma_db")
+    VECTOR_DB_PATH = os.getenv("VECTOR_DB_PATH", CHROMA_DB_PATH)
 
     EMBEDDING_MODEL = os.getenv(
         "EMBEDDING_MODEL",
@@ -41,15 +43,7 @@ class Settings:
     # REDIS (MEMORY + QUEUES)
     # =============================
 
-    REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-    REDIS_DB = int(os.getenv("REDIS_DB", 0))
-
-    # 🔥 FIX: Derived Redis URL (Kubernetes-ready)
-    REDIS_URL = os.getenv(
-        "REDIS_URL",
-        f"redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
-    )
+    REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
     # =============================
     # INGESTION SETTINGS
@@ -81,9 +75,7 @@ class Settings:
     MAX_AGENT_STEPS = int(os.getenv("MAX_AGENT_STEPS", 5))
 
     ENABLE_RAG = os.getenv("ENABLE_RAG", "true").lower() == "true"
-
     ENABLE_SQL_TOOL = os.getenv("ENABLE_SQL_TOOL", "true").lower() == "true"
-
     ENABLE_MEMORY = os.getenv("ENABLE_MEMORY", "true").lower() == "true"
 
     # =============================

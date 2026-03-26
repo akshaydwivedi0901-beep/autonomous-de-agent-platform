@@ -1,5 +1,6 @@
 import logging
 import uuid
+import json
 
 from app.state.agent_state import AgentState
 from app.orchestrator.llm_router import LLMRouter
@@ -8,60 +9,98 @@ from app.rag.retriever import retrieve_context
 logger = logging.getLogger(__name__)
 
 
-def ba_agent(state: AgentState):
-
-    if not state.execution_id:
-        state.execution_id = str(uuid.uuid4())
-
-    llm = LLMRouter.get_llm("planner", state.question)
-
-    question = state.question
-
-    # RAG context
+def safe_json_parse(text: str):
     try:
-        rag_context = retrieve_context(question)
+        return json.loads(text)
     except Exception:
-        rag_context = ""
+        return None
 
-    state.rag_context = rag_context
 
-    history = ""
+def ba_agent(state: AgentState):
+    try:
+        logger.info("🔥 BA AGENT START")
 
-    if state.conversation_history:
-        history = "\n".join(
-            [f"{m['role']}: {m['message']}" for m in state.conversation_history]
-        )
+        # =============================
+        # INIT
+        # =============================
+        if not getattr(state, "execution_id", None):
+            state.execution_id = str(uuid.uuid4())
 
-    prompt = f"""
+        question = state.question
+
+        llm = LLMRouter.get_llm("planner", question)
+
+        # =============================
+        # RAG (safe)
+        # =============================
+        try:
+            rag_context = retrieve_context(question)
+        except Exception as e:
+            logger.warning(f"RAG retrieval failed: {e}")
+            rag_context = ""
+
+        state.rag_context = str(rag_context)
+
+        # =============================
+        # PROMPT
+        # =============================
+        prompt = f"""
 You are a Business Analyst.
 
-Conversation history:
-{history}
-
-Business knowledge:
-{rag_context}
+Return ONLY valid JSON.
 
 Question:
 {question}
 
-Explain:
-1. Business metric
-2. Filters
-3. Tables required
-4. Columns required
+Format:
+{{
+  "metric": "",
+  "filters": [],
+  "tables": [],
+  "columns": []
+}}
 """
 
-    response = llm.invoke(prompt)
+        # =============================
+        # LLM CALL
+        # =============================
+        response = llm.invoke(prompt)
+        raw_output = response.content.strip()
 
-    state.business_analysis = response.content.strip()
-    state.status = "BA_COMPLETE"
+        logger.info(f"BA RAW OUTPUT:\n{raw_output}")
 
-    logger.info({
-        "execution_id": state.execution_id,
-        "agent": "ba",
-        "status": state.status
-    })
+        # =============================
+        # SAFE PARSING
+        # =============================
+        parsed = safe_json_parse(raw_output)
 
-    state.history.append("BA_AGENT")
+        if not parsed:
+            logger.warning("⚠️ BA JSON parse failed, using fallback")
 
-    return state
+            parsed = {
+                "metric": "unknown",
+                "filters": [],
+                "tables": [],
+                "columns": []
+            }
+
+        state.business_analysis = parsed
+        state.status = "BA_COMPLETE"
+
+        return state
+
+    except Exception as e:
+        logger.exception("❌ BA Agent failed")
+
+        # 🔥 NEVER BREAK FLOW
+        state.business_analysis = {
+            "metric": "fallback",
+            "filters": [],
+            "tables": [],
+            "columns": []
+        }
+
+        state.status = "BA_FAILED"
+        state.error = str(e)
+
+        return state

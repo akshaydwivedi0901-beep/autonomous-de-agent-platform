@@ -9,14 +9,7 @@ def explain_agent(state: AgentState):
     try:
         logger.info("🔥 EXPLAIN AGENT START")
 
-        result = state.execution_result
-
-        if not result:
-            state.final_answer = "No result returned"
-            state.status = "EXPLAINED"
-            return state
-
-        rows = result.get("rows")
+        rows = state.rows
 
         if not rows:
             state.final_answer = "No data found"
@@ -25,29 +18,36 @@ def explain_agent(state: AgentState):
 
         first_row = rows[0]
 
-        if isinstance(first_row, (list, tuple)):
-            value = first_row[0]
-        elif isinstance(first_row, dict):
-            value = list(first_row.values())[0]
+        # =============================
+        # ✅ CASE 1: dict rows (best case)
+        # =============================
+        if isinstance(first_row, dict):
+
+            if len(first_row) == 1:
+                value = list(first_row.values())[0]
+                state.final_answer = f"Result is: {value}"
+            else:
+                lines = ["Customer Details:\n"]
+                for k, v in first_row.items():
+                    lines.append(f"{k}: {v}")
+                state.final_answer = "\n".join(lines)
+
+        # =============================
+        # ✅ CASE 2: tuple rows (Snowflake default)
+        # =============================
+        elif isinstance(first_row, (list, tuple)):
+
+            # If only 1 column
+            if len(first_row) == 1:
+                state.final_answer = f"Result is: {first_row[0]}"
+            else:
+                # fallback generic
+                values = [str(v) for v in first_row]
+                state.final_answer = " | ".join(values)
+
         else:
-            value = first_row
+            state.final_answer = str(first_row)
 
-        # =============================
-        # 🔥 HANDLE NULL
-        # =============================
-        if value is None:
-            state.final_answer = "No revenue data found for the selected time period"
-            state.status = "EXPLAINED"
-            return state
-
-        # Format number
-        try:
-            value = float(value)
-            value = f"{value:,.2f}"
-        except Exception:
-            pass
-
-        state.final_answer = f"Revenue last quarter is: {value}"
         state.status = "EXPLAINED"
 
         logger.info(f"✅ FINAL ANSWER: {state.final_answer}")
@@ -55,9 +55,8 @@ def explain_agent(state: AgentState):
         return state
 
     except Exception as e:
-        logger.exception(f"❌ EXPLAIN AGENT FAILED: {str(e)}")
+        logger.exception("❌ EXPLAIN AGENT FAILED")
 
-        state.final_answer = "Error generating explanation"
         state.error = str(e)
         state.status = "EXPLAIN_FAILED"
 

@@ -42,9 +42,20 @@ def has_select_star(sql: str) -> bool:
     return "SELECT *" in sql.upper()
 
 
+# =========================================
+# 🔥 FIXED LIMIT HANDLER (CRITICAL FIX)
+# =========================================
 def enforce_limit(sql: str) -> str:
+    sql = sql.strip()
+
+    # ✅ Remove trailing semicolon (fix for Snowflake error)
+    if sql.endswith(";"):
+        sql = sql[:-1]
+
+    # ✅ Add LIMIT only if not present
     if "LIMIT" not in sql.upper():
-        return sql.strip() + "\nLIMIT 100"
+        sql += "\nLIMIT 100"
+
     return sql
 
 
@@ -65,7 +76,6 @@ def validator_agent(state: AgentState):
             raise ValueError("No SQL generated")
 
         sql = sql.strip()
-        sql_upper = sql.upper()
 
         # =============================
         # 🚫 Dangerous SQL
@@ -104,7 +114,7 @@ def validator_agent(state: AgentState):
             return state
 
         # =============================
-        # 💰 Cost control
+        # 💰 Cost control (FIXED)
         # =============================
         sql = enforce_limit(sql)
 

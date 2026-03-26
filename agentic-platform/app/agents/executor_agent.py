@@ -10,28 +10,24 @@ def executor_agent(state: AgentState):
     try:
         logger.info("🔥 EXECUTOR AGENT START")
 
-        # =============================
-        # ✅ USE VALIDATED SQL (CRITICAL FIX)
-        # =============================
         sql = state.validated_sql or state.generated_sql
 
         if not sql:
             raise ValueError("No SQL available for execution")
 
+        # 🔥 REMOVE SEMICOLON
+        sql = sql.strip().rstrip(";")
+
+        # 🔥 SAFE LIMIT
+        if "limit" not in sql.lower():
+            sql = f"{sql} LIMIT 100"
+
         logger.info(f"Executing SQL:\n{sql}")
 
-        # =============================
-        # ✅ EXECUTE
-        # =============================
         service = SnowflakeService()
         result = service.execute(sql)
 
-        # =============================
-        # ✅ STORE RESULT (SAFE)
-        # =============================
         state.execution_result = result
-
-        # Optional breakdown
         state.rows = result.get("rows")
         state.row_count = result.get("row_count")
         state.execution_time = result.get("execution_time")

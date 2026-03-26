@@ -5,11 +5,15 @@ from app.core.config import settings
 
 def get_vector_store():
 
+    # ✅ FIX: Do not load anything if RAG disabled
+    if str(settings.ENABLE_RAG).lower() != "true":
+        return None
+
     embeddings = get_embedding_model()
 
     if settings.VECTOR_DB == "chroma":
         return Chroma(
-            persist_directory=settings.VECTOR_DB_PATH,
+            persist_directory=settings.CHROMA_DB_PATH,
             embedding_function=embeddings,
         )
 
