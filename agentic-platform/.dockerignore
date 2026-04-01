@@ -1,33 +1,96 @@
-# Python
+# =============================
+# Git
+# =============================
+.git/
+.gitignore
+.github/
+.gitattributes
+
+# =============================
+# 🔥 SECRETS / ENV
+# =============================
+.env
+.env.*
+*.env
+k8s/secrets/
+secrets/
+*.pem
+*.key
+
+# =============================
+# Python cache
+# =============================
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.pyw
 
+# =============================
+# Virtual env (use requirements.txt instead)
+# =============================
+venv/
+.venv/
+env/
+ENV/
+
+# =============================
 # Logs
+# =============================
 *.log
+logs/
 
-# Env
-.env
-
-# Git
-.git
-.gitignore
-.github
-.vscode/
-
-# Tests & Dev
-tests/
-terraform/
-
-# Local data / DB
+# =============================
+# Local DB / vector store
+# =============================
 chroma_db/
+*.db
 *.sqlite3
 
-# ML / embeddings (VERY IMPORTANT)
+# =============================
+# ML / model weights (VERY IMPORTANT — can be GBs)
+# =============================
 *.bin
 *.pt
 *.onnx
+*.safetensors
+models/
 
-# OS / misc
+# =============================
+# Dev tooling (not needed in container)
+# =============================
+.vscode/
+.idea/
 .DS_Store
+Thumbs.db
+
+# =============================
+# Tests (not needed at runtime)
+# =============================
+tests/
+test_*.py
+*_test.py
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =============================
+# Infra (not needed in app container)
+# =============================
+terraform/
+k8s/
+*.tf
+*.tfstate
+*.tfvars
+Dockerfile*
+docker-compose*.yml
+
+# =============================
+# Docs & misc
+# =============================
+README.md
+*.md
+docs/
+notebooks/
+*.ipynb

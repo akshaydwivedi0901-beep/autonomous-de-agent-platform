@@ -4,13 +4,15 @@ metadata:
   name: ai-agent
   labels:
     app: ai-agent
-
 spec:
-  replicas: 1
-  revisionHistoryLimit: 1
+  # ⚠️ replicas removed — HPA manages this now (hpa.yaml)
+  revisionHistoryLimit: 3
 
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0    # zero-downtime deploys
 
   selector:
     matchLabels:
@@ -20,11 +22,15 @@ spec:
     metadata:
       labels:
         app: ai-agent
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "8000"
 
     spec:
       containers:
         - name: ai-agent
-          image: 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:v321
+          image: 416573464919.dkr.ecr.us-east-1.amazonaws.com/ai-agent:latest
           imagePullPolicy: Always
 
           ports:
@@ -32,13 +38,16 @@ spec:
 
           env:
             # =============================
-            # GROQ
+            # GROQ — now a Secret (was hardcoded before!)
             # =============================
             - name: GROQ_API_KEY
-              value: "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"
+              valueFrom:
+                secretKeyRef:
+                  name: groq-secret
+                  key: GROQ_API_KEY
 
             # =============================
-            # SNOWFLAKE SECRETS
+            # SNOWFLAKE
             # =============================
             - name: SNOWFLAKE_USER
               valueFrom:
@@ -83,10 +92,28 @@ spec:
                   key: SNOWFLAKE_ROLE
 
             # =============================
-            # FLAGS
+            # APP CONFIG (non-sensitive → ConfigMap)
             # =============================
+            - name: ENVIRONMENT
+              value: "prod"
+
+            - name: DB_TYPE
+              value: "snowflake"
+
             - name: ENABLE_RAG
-              value: "false"
+              value: "true"
+
+            - name: ENABLE_MEMORY
+              value: "true"
+
+            - name: REDIS_URL
+              value: "redis://redis:6379/0"
+
+            - name: LARGE_MODEL
+              value: "llama3-70b-8192"
+
+            - name: SMALL_MODEL
+              value: "llama-3.1-8b-instant"
 
           # =============================
           # HEALTH CHECKS
@@ -97,6 +124,7 @@ spec:
               port: 8000
             initialDelaySeconds: 30
             periodSeconds: 10
+            failureThreshold: 3
 
           readinessProbe:
             httpGet:
@@ -104,14 +132,15 @@ spec:
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 5
+            failureThreshold: 2
 
           # =============================
-          # FREE TIER OPTIMIZED
+          # RESOURCE LIMITS (tuned for HPA)
           # =============================
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "50m"
-            limits:
               memory: "256Mi"
-              cpu: "150m"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

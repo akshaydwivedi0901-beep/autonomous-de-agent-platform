@@ -4,6 +4,24 @@
 .env
 .env.*
 *.env
+.env.local
+.env.production
+
+# =============================
+# 🔥 SECRETS (CRITICAL)
+# =============================
+k8s/secrets/
+secrets/
+*.secret
+*secret*.sh
+*secret*.yaml
+*secret*.yml
+kubeconfig
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
 
 # =============================
 # Python
@@ -12,35 +30,46 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.pyw
+*.pyz
+.Python
 
 # =============================
 # Virtual env
 # =============================
 venv/
 .venv/
+env/
+ENV/
 
 # =============================
 # Logs
 # =============================
 *.log
+logs/
 
 # =============================
 # Local DB / vector store
 # =============================
 chroma_db/
 *.db
+*.sqlite3
+*.sqlite
 
 # =============================
 # Docker
 # =============================
 *.tar
 docker-compose.override.yml
+docker-compose.local.yml
 
 # =============================
 # IDE
 # =============================
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # =============================
 # OS
@@ -53,3 +82,33 @@ Thumbs.db
 # =============================
 dist/
 build/
+*.egg-info/
+.eggs/
+
+# =============================
+# Testing
+# =============================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# =============================
+# ML / model weights
+# =============================
+*.bin
+*.pt
+*.onnx
+*.safetensors
+models/
+
+# =============================
+# Terraform state (sensitive!)
+# =============================
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+terraform.tfvars.json

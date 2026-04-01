@@ -2,93 +2,73 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from app.api.chat_api import router as chat_router
-from app.api.health_api import router as health_router
-from app.api.metrics_api import router as metrics_router
-
 from app.state.agent_state import AgentState
 from app.orchestrator.graph import build_graph
 from app.api.models import QueryRequest, QueryResponse
-
 from app.memory.redis_memory import RedisMemory
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-router.include_router(chat_router)
-router.include_router(health_router)
-router.include_router(metrics_router)
-
+# Build graph once at startup (thread-safe, reused across requests)
 graph = build_graph()
-
-# ✅ Keep Redis optional
 memory = RedisMemory()
 
 
-@router.post("/execute")
+@router.post("/execute", response_model=QueryResponse)
 async def execute(request: QueryRequest):
 
     session_id = request.session_id
 
     # =============================
-    # LOAD MEMORY (SAFE MODE)
+    # LOAD CONVERSATION HISTORY
     # =============================
-    try:
-        history = memory.get_history(session_id)
-    except Exception as e:
-        logger.warning(f"Redis not available, skipping memory: {e}")
-        history = []
+    history = memory.get_recent_context(session_id, turns=6)
 
+    # =============================
+    # BUILD STATE
+    # =============================
     state = AgentState(
         question=request.question,
         session_id=session_id,
-        conversation_history=history
+        environment=request.environment or "dev",
+        conversation_history=history,
     )
 
     # =============================
-    # GRAPH EXECUTION (SAFE)
+    # RUN GRAPH (sync invoke — LangGraph compiled graphs are sync)
     # =============================
     try:
-        result = await graph.ainvoke(state)
+        result = graph.invoke(state)
+
+        if isinstance(result, dict):
+            result = AgentState(**result)
 
     except Exception as e:
         logger.exception("Graph execution failed")
-
-        return QueryResponse(
-            execution_id="FAILED",
-            answer="Sorry, something went wrong while processing your request.",
-            sql=None,
-            rows=0,
-            status="FAILED"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
     # =============================
-    # SAVE MEMORY (SAFE MODE)
+    # PERSIST TURN TO MEMORY
     # =============================
     try:
-        memory.append_message(
-            session_id,
-            "user",
-            request.question
-        )
-
+        memory.append_message(session_id, "user", request.question)
         memory.append_message(
             session_id,
             "assistant",
-            result.explanation
+            result.final_answer or result.explanation or "",
         )
-
     except Exception as e:
-        logger.warning(f"Redis not available, skipping save: {e}")
+        logger.warning(f"Memory save failed (non-fatal): {e}")
 
     # =============================
-    # RESPONSE (SAFE ACCESS)
+    # RESPONSE
     # =============================
     return QueryResponse(
-        execution_id=getattr(result, "execution_id", "N/A"),
-        answer=getattr(result, "explanation", "No response generated"),
-        sql=getattr(result, "validated_sql", None),
-        rows=getattr(result, "row_count", 0),
-        status=getattr(result, "status", "UNKNOWN")
+        execution_id=result.execution_id or "N/A",
+        answer=result.final_answer or result.explanation or "No response generated",
+        sql=result.validated_sql,
+        rows=result.row_count or 0,
+        status=result.status or "UNKNOWN",
     )
