@@ -1,5 +1,4 @@
 import logging
-import re
 
 from app.state.agent_state import AgentState
 

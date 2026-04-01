@@ -53,7 +53,7 @@ def _format_history(history: list) -> str:
         if m.get("role") in ("user", "assistant")
     ][-6:]
     return "\n".join(
-        f"  {m.get('role','user').upper()}: {m.get('message','')}"
+        f"  {m.get('role', 'user').upper()}: {m.get('message', '')}"
         for m in relevant
     )
 
@@ -103,7 +103,7 @@ def explain_agent(state: AgentState) -> AgentState:
 
         return state
 
-    except Exception as e:
+    except Exception:
         logger.exception("❌ EXPLAIN AGENT FAILED")
 
         # Graceful fallback — never crash the pipeline

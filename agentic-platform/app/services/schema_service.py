@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from functools import lru_cache
 from typing import Dict, List
 
 from app.core.config import settings
