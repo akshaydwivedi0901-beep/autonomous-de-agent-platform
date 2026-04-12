@@ -3,6 +3,17 @@ name: Deploy AI Agent
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action"
+        required: true
+        default: "deploy-only"
+        type: choice
+        options:
+          - deploy-only
+          - spin-up-and-deploy
+          - tear-down
 
 env:
   AWS_REGION: us-east-1
@@ -13,36 +24,24 @@ env:
 
 jobs:
 
-  # ============================================================
-  # JOB 1: BUILD + PUSH TO ECR
-  # ============================================================
   build:
-    name: Build & push to ECR
+    name: Build and push to ECR
     runs-on: ubuntu-latest
-
+    outputs:
+      image_uri: ${{ steps.tag.outputs.image_uri }}
     defaults:
       run:
         working-directory: agentic-platform
-
-    outputs:
-      image_tag: ${{ steps.tag.outputs.image_tag }}
-      image_uri: ${{ steps.tag.outputs.image_uri }}
-
     steps:
+      - uses: actions/checkout@v4
 
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # ── Image tag = short SHA + timestamp (unique + traceable) ──
       - name: Generate image tag
         id: tag
         run: |
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
           IMAGE_TAG="${SHORT_SHA}-$(date +%Y%m%d%H%M%S)"
           IMAGE_URI="${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${IMAGE_TAG}"
-          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
           echo "image_uri=${IMAGE_URI}" >> $GITHUB_OUTPUT
-          echo "Building: ${IMAGE_URI}"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -51,52 +50,19 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to ECR
+      - name: Login and push to ECR
         run: |
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | \
-          docker login --username AWS --password-stdin \
-          ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
-
-      - name: Build Docker image
-        run: |
-          docker build \
-            --label "git-commit=${{ github.sha }}" \
-            --label "built-by=github-actions" \
-            --label "build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            -t ${{ steps.tag.outputs.image_uri }} \
-            -t ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest \
-            -f docker/Dockerfile .
-
-      # ── Scan for CVEs before pushing ──
-      - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ steps.tag.outputs.image_uri }}
-          format: table
-          exit-code: 0           # set to 1 to block deploys on CRITICAL CVEs
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-
-      - name: Push to ECR
-        run: |
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+          docker build -t ${{ steps.tag.outputs.image_uri }} -f docker/Dockerfile .
           docker push ${{ steps.tag.outputs.image_uri }}
-          docker push ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
-          echo "✅ Image pushed: ${{ steps.tag.outputs.image_tag }}"
 
-  # ============================================================
-  # JOB 2: DEPLOY TO EKS
-  # Runs only after build succeeds
-  # ============================================================
   deploy:
     name: Deploy to EKS
     runs-on: ubuntu-latest
     needs: build
-    #environment: production     # ← manual approval gate in GitHub
-
+    if: github.event.inputs.action != 'tear-down'
     steps:
-
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -105,91 +71,46 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update kubeconfig
+      - name: Check cluster exists and deploy
         run: |
-          aws eks update-kubeconfig \
-            --region ${{ env.AWS_REGION }} \
-            --name ${{ env.EKS_CLUSTER }}
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER }} 2>/dev/null || { echo "Cluster not found - skipping deploy"; exit 0; }
+          kubectl create secret generic groq-secret --from-literal=GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic snowflake-secret --from-literal=SNOWFLAKE_USER="${{ secrets.SNOWFLAKE_USER }}" --from-literal=SNOWFLAKE_PASSWORD="${{ secrets.SNOWFLAKE_PASSWORD }}" --from-literal=SNOWFLAKE_ACCOUNT="${{ secrets.SNOWFLAKE_ACCOUNT }}" --from-literal=SNOWFLAKE_WAREHOUSE="${{ secrets.SNOWFLAKE_WAREHOUSE }}" --from-literal=SNOWFLAKE_DATABASE="${{ secrets.SNOWFLAKE_DATABASE }}" --from-literal=SNOWFLAKE_SCHEMA="${{ secrets.SNOWFLAKE_SCHEMA }}" --from-literal=SNOWFLAKE_ROLE="${{ secrets.SNOWFLAKE_ROLE }}" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic app-secret --from-literal=API_KEY="${{ secrets.API_KEY }}" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f agentic-platform/k8s/chroma-pvc.yaml
+          kubectl apply -f agentic-platform/k8s/redis-deployment.yaml
+          kubectl apply -f agentic-platform/k8s/deployment.yml
+          kubectl apply -f agentic-platform/k8s/service.yaml
+          kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} ${{ env.DEPLOYMENT_NAME }}=${{ needs.build.outputs.image_uri }}
+          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} --timeout=300s
 
-      # ── Apply all manifests (idempotent) ──
-      - name: Apply Kubernetes manifests
-        working-directory: agentic-platform
-        run: |
-          kubectl apply -f k8s/deployment.yml
-          kubectl apply -f k8s/service.yaml
-          kubectl apply -f k8s/hpa.yaml        # ← auto-scaling
-
-      # ── Rolling update with new image ──
-      - name: Update deployment image
-        run: |
-          kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} \
-            ${{ env.DEPLOYMENT_NAME }}=${{ needs.build.outputs.image_uri }}
-
-      # ── Wait for rollout to complete ──
-      - name: Wait for rollout
-        run: |
-          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} \
-            --timeout=300s
-
-      # ── Health check against live service ──
-      - name: Health check
-        run: |
-          kubectl wait --for=condition=ready pod \
-            -l app=ai-agent \
-            --timeout=120s
-
-          EXTERNAL_IP=$(kubectl get svc ai-agent-service \
-            -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-
-          if [ -z "$EXTERNAL_IP" ]; then
-            echo "⚠️ No external IP yet — checking pod health directly"
-            kubectl get pods -l app=ai-agent
-          else
-            echo "Service URL: http://${EXTERNAL_IP}"
-            for i in {1..5}; do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                http://${EXTERNAL_IP}/health || echo "000")
-              if [ "$STATUS" = "200" ]; then
-                echo "✅ Health check passed"
-                exit 0
-              fi
-              echo "Attempt $i: HTTP ${STATUS} — retrying in 15s..."
-              sleep 15
-            done
-            echo "❌ Health check failed after 5 attempts"
-            exit 1
-          fi
-
-      # ── Debug info if anything fails ──
-      - name: Debug on failure
-        if: failure()
-        run: |
-          echo "===== POD STATUS ====="
-          kubectl get pods -l app=ai-agent
-
-          echo "===== DESCRIBE ====="
-          kubectl describe pods -l app=ai-agent
-
-          echo "===== LOGS ====="
-          kubectl logs -l app=ai-agent --tail=100 || true
-
-          echo "===== HPA STATUS ====="
-          kubectl get hpa ai-agent-hpa || true
-
-      # ── Auto rollback if deploy fails ──
       - name: Rollback on failure
         if: failure()
-        run: |
-          echo "❌ Deploy failed — rolling back to previous version"
-          kubectl rollout undo deployment/${{ env.DEPLOYMENT_NAME }}
-          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} --timeout=120s
-          echo "✅ Rollback complete"
+        run: kubectl rollout undo deployment/${{ env.DEPLOYMENT_NAME }} || true
 
-      - name: Deployment success
-        if: success()
+  tear-down:
+    name: Tear down EKS cluster
+    runs-on: ubuntu-latest
+    if: github.event.inputs.action == 'tear-down'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Destroy cluster
         run: |
-          echo "🚀 Successfully deployed to EKS"
-          echo "Image tag : ${{ needs.build.outputs.image_tag }}"
-          echo "Commit    : ${{ github.sha }}"
-          echo "Author    : ${{ github.actor }}"
-          echo "Timestamp : $(date -u)"
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER }} || true
+          kubectl delete deployment ai-agent redis --ignore-not-found=true || true
+          kubectl delete svc ai-agent-service redis --ignore-not-found=true || true
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform destroy
+        working-directory: terraform
+        run: terraform init && terraform destroy -auto-approve

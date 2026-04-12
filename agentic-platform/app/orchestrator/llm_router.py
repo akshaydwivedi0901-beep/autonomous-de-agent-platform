@@ -92,3 +92,52 @@ class LLMRouter:
             return settings.SMALL_MODEL
 
         return settings.DEFAULT_MODEL
+
+from dataclasses import dataclass
+
+MODELS = {
+    "nano":   "llama-3.1-8b-instant",
+    "small":  "llama-3.1-8b-instant",
+    "medium": "llama-3.3-70b-versatile",
+    "large":  "llama-3.3-70b-versatile",
+}
+
+@dataclass
+class ComplexityScore:
+    score: int
+    tier: str
+    model: str
+    reasons: list
+
+def score_query_complexity(question: str) -> ComplexityScore:
+    q = question.lower()
+    score = 0
+    reasons = []
+    simple = ["how many", "count", "total", "what is", "show me", "list"]
+    if any(k in q for k in simple):
+        score += 5
+    medium = ["average", "avg", "top", "rank", "compare", "between", "per month", "per year", "group"]
+    hits = sum(1 for k in medium if k in q)
+    score += hits * 10
+    joins = ["join", "with", "combined", "across"]
+    score += sum(1 for k in joins if k in q) * 15
+    complex_kw = ["running total", "cumulative", "window", "lag", "lead", "percentile",
+                  "rank over", "moving average", "year over year", "month over month",
+                  "growth rate", "correlation"]
+    score += sum(1 for k in complex_kw if k in q) * 25
+    entities = ["customer", "order", "supplier", "part", "lineitem", "nation"]
+    ec = sum(1 for e in entities if e in q)
+    if ec > 2:
+        score += (ec - 2) * 10
+    if len(q.split()) > 20:
+        score += 10
+    score = min(score, 100)
+    if score <= 20:
+        tier, model = "nano", MODELS["nano"]
+    elif score <= 40:
+        tier, model = "small", MODELS["small"]
+    elif score <= 70:
+        tier, model = "medium", MODELS["medium"]
+    else:
+        tier, model = "large", MODELS["large"]
+    return ComplexityScore(score=score, tier=tier, model=model, reasons=reasons)
