@@ -16,7 +16,7 @@ class SnowflakeService:
         cursor = conn.cursor()
 
         try:
-            # ✅ SET CONTEXT
+            #  SET CONTEXT
             cursor.execute("USE DATABASE SNOWFLAKE_SAMPLE_DATA")
             cursor.execute("USE SCHEMA TPCH_SF1")
 

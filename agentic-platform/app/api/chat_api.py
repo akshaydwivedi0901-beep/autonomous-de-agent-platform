@@ -42,9 +42,9 @@ async def chat_stream(request: Request):
             # Step 3: Run graph
             result = graph.invoke(state)
 
-            # 🔥 IMPORTANT: handle dict vs AgentState
+            #  IMPORTANT: handle dict vs AgentState
             if isinstance(result, dict):
-                logger.warning("⚠️ Graph returned dict → converting to AgentState")
+                logger.warning(" Graph returned dict → converting to AgentState")
                 state = AgentState(**result)
             else:
                 state = result
@@ -55,11 +55,11 @@ async def chat_stream(request: Request):
             # FINAL OUTPUT LOGIC (CRITICAL FIX)
             # =========================================
 
-            # 1️⃣ If final_answer exists → use it
+            # 1️ If final_answer exists → use it
             if getattr(state, "final_answer", None):
                 yield format_sse("message", state.final_answer)
 
-            # 2️⃣ If execution_result exists → fallback
+            # 2️ If execution_result exists → fallback
             elif getattr(state, "execution_result", None):
                 result = state.execution_result
                 value = result.get("value")
@@ -70,23 +70,23 @@ async def chat_stream(request: Request):
                     f"Result: {value} (Execution time: {exec_time}s)"
                 )
 
-            # 3️⃣ If business_analysis exists
+            # 3️ If business_analysis exists
             elif getattr(state, "business_analysis", None):
                 yield format_sse("message", state.business_analysis)
 
-            # 4️⃣ If SQL exists
+            # 4️ If SQL exists
             elif getattr(state, "sql_query", None):
                 yield format_sse("message", f"SQL Generated:\n{state.sql_query}")
 
-            # 5️⃣ Error fallback
+            # 5️ Error fallback
             else:
                 yield format_sse(
                     "message",
-                    "⚠️ I couldn't generate a reliable answer. Please rephrase your question."
+                    " I couldn't generate a reliable answer. Please rephrase your question."
                 )
 
         except Exception as e:
-            logger.exception("❌ STREAM FAILED")
+            logger.exception(" STREAM FAILED")
 
             yield format_sse(
                 "error",
@@ -129,7 +129,7 @@ async def chat(request: Request):
         }
 
     except Exception as e:
-        logger.exception("❌ CHAT FAILED")
+        logger.exception(" CHAT FAILED")
 
         return {
             "error": str(e)

@@ -32,7 +32,7 @@ def _score(question: str, keywords: list) -> int:
 def router_agent(state: AgentState) -> AgentState:
 
     try:
-        logger.info("🔥 ROUTER START")
+        logger.info(" ROUTER START")
 
         question = state.question or ""
 
@@ -55,11 +55,11 @@ def router_agent(state: AgentState) -> AgentState:
             # Default to SQL (handles pure data questions + ties)
             state.route = "SQL"
 
-        logger.info(f"✅ Route decided: {state.route}")
+        logger.info(f" Route decided: {state.route}")
 
         return state
 
     except Exception as e:
-        logger.error(f"❌ ROUTER FAILED: {e}")
+        logger.error(f" ROUTER FAILED: {e}")
         state.route = "SQL"
         return state

@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 def rag_agent(state: AgentState):
 
     try:
-        logger.info("🔥 RAG AGENT START")
+        logger.info(" RAG AGENT START")
 
         question = state.question
 
@@ -40,7 +40,7 @@ def rag_agent(state: AgentState):
             "status": state.status
         })
 
-        # ✅ FIXED MEMORY
+        #  FIXED MEMORY
         state.conversation_history.append({
             "role": "system",
             "message": "RAG_AGENT"
@@ -49,7 +49,7 @@ def rag_agent(state: AgentState):
         return state
 
     except Exception as e:
-        logger.exception("❌ RAG AGENT FAILED")
+        logger.exception(" RAG AGENT FAILED")
 
         state.status = "RAG_FAILED"
         state.error = str(e)

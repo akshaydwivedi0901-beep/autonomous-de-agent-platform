@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 
 # =========================================
-# 🔥 CONFIG
+#  CONFIG
 # =========================================
 ALLOWED_TABLES = {
     "CUSTOMER", "ORDERS", "LINEITEM",
@@ -20,7 +20,7 @@ FORBIDDEN_KEYWORDS = [
 
 
 # =========================================
-# 🔥 HELPERS
+#  HELPERS
 # =========================================
 def contains_forbidden(sql: str) -> bool:
     sql_upper = sql.upper()
@@ -42,16 +42,16 @@ def has_select_star(sql: str) -> bool:
 
 
 # =========================================
-# 🔥 FIXED LIMIT HANDLER (CRITICAL FIX)
+#  FIXED LIMIT HANDLER (CRITICAL FIX)
 # =========================================
 def enforce_limit(sql: str) -> str:
     sql = sql.strip()
 
-    # ✅ Remove trailing semicolon (fix for Snowflake error)
+    #  Remove trailing semicolon (fix for Snowflake error)
     if sql.endswith(";"):
         sql = sql[:-1]
 
-    # ✅ Add LIMIT only if not present
+    #  Add LIMIT only if not present
     if "LIMIT" not in sql.upper():
         sql += "\nLIMIT 100"
 
@@ -59,12 +59,12 @@ def enforce_limit(sql: str) -> str:
 
 
 # =========================================
-# 🔥 MAIN VALIDATOR
+#  MAIN VALIDATOR
 # =========================================
 def validator_agent(state: AgentState):
 
     try:
-        logger.info("🔥 VALIDATOR START")
+        logger.info(" VALIDATOR START")
 
         sql = state.generated_sql
 
@@ -77,7 +77,7 @@ def validator_agent(state: AgentState):
         sql = sql.strip()
 
         # =============================
-        # 🚫 Dangerous SQL
+        #  Dangerous SQL
         # =============================
         if contains_forbidden(sql):
             state.validation_status = "INVALID"
@@ -86,7 +86,7 @@ def validator_agent(state: AgentState):
             return state
 
         # =============================
-        # ✅ Must be SELECT
+        #  Must be SELECT
         # =============================
         if not is_select_query(sql):
             state.validation_status = "INVALID"
@@ -95,7 +95,7 @@ def validator_agent(state: AgentState):
             return state
 
         # =============================
-        # ✅ Must use known tables
+        #  Must use known tables
         # =============================
         if not contains_allowed_table(sql):
             state.validation_status = "INVALID"
@@ -104,7 +104,7 @@ def validator_agent(state: AgentState):
             return state
 
         # =============================
-        # 🚫 No SELECT *
+        # No SELECT *
         # =============================
         if has_select_star(sql):
             state.validation_status = "INVALID"
@@ -113,23 +113,23 @@ def validator_agent(state: AgentState):
             return state
 
         # =============================
-        # 💰 Cost control (FIXED)
+        #  Cost control (FIXED)
         # =============================
         sql = enforce_limit(sql)
 
         # =============================
-        # ✅ SUCCESS
+        # SUCCESS
         # =============================
         state.validation_status = "VALID"
         state.validated_sql = sql
         state.status = "VALID_SQL"
 
-        logger.info("✅ SQL VALIDATION PASSED")
+        logger.info(" SQL VALIDATION PASSED")
 
         return state
 
     except Exception as e:
-        logger.exception("❌ VALIDATOR FAILED")
+        logger.exception(" VALIDATOR FAILED")
 
         state.validation_status = "INVALID"
         state.status = "VALIDATOR_FAILED"

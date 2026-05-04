@@ -1,34 +1,31 @@
 import logging
-
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
 from app.state.agent_state import AgentState
 from app.orchestrator.graph import build_graph
 from app.api.models import QueryRequest, QueryResponse
 from app.memory.redis_memory import RedisMemory
 
+# ✅ JWT import
+from app.middleware.auth_jwt import get_current_user
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Build graph once at startup (thread-safe, reused across requests)
 graph = build_graph()
 memory = RedisMemory()
 
 
 @router.post("/execute", response_model=QueryResponse)
-async def execute(request: QueryRequest):
-
+async def execute(
+    request: QueryRequest,
+    user: dict = Depends(get_current_user)   # 🔥 REQUIRED
+):
     session_id = request.session_id
 
-    # =============================
-    # LOAD CONVERSATION HISTORY
-    # =============================
     history = memory.get_recent_context(session_id, turns=6)
 
-    # =============================
-    # BUILD STATE
-    # =============================
     state = AgentState(
         question=request.question,
         session_id=session_id,
@@ -36,9 +33,6 @@ async def execute(request: QueryRequest):
         conversation_history=history,
     )
 
-    # =============================
-    # RUN GRAPH (sync invoke — LangGraph compiled graphs are sync)
-    # =============================
     try:
         result = graph.invoke(state)
 
@@ -49,9 +43,6 @@ async def execute(request: QueryRequest):
         logger.exception("Graph execution failed")
         raise HTTPException(status_code=500, detail=str(e))
 
-    # =============================
-    # PERSIST TURN TO MEMORY
-    # =============================
     try:
         memory.append_message(session_id, "user", request.question)
         memory.append_message(
@@ -60,11 +51,8 @@ async def execute(request: QueryRequest):
             result.final_answer or result.explanation or "",
         )
     except Exception as e:
-        logger.warning(f"Memory save failed (non-fatal): {e}")
+        logger.warning(f"Memory save failed: {e}")
 
-    # =============================
-    # RESPONSE
-    # =============================
     return QueryResponse(
         execution_id=result.execution_id or "N/A",
         answer=result.final_answer or result.explanation or "No response generated",

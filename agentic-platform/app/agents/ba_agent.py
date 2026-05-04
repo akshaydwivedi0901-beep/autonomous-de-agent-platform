@@ -18,7 +18,7 @@ def safe_json_parse(text: str):
 
 def ba_agent(state: AgentState):
     try:
-        logger.info("🔥 BA AGENT START")
+        logger.info(" BA AGENT START")
 
         # =============================
         # INIT
@@ -75,7 +75,7 @@ Format:
         parsed = safe_json_parse(raw_output)
 
         if not parsed:
-            logger.warning("⚠️ BA JSON parse failed, using fallback")
+            logger.warning(" BA JSON parse failed, using fallback")
 
             parsed = {
                 "metric": "unknown",
@@ -90,9 +90,9 @@ Format:
         return state
 
     except Exception as e:
-        logger.exception("❌ BA Agent failed")
+        logger.exception(" BA Agent failed")
 
-        # 🔥 NEVER BREAK FLOW
+        #  NEVER BREAK FLOW
         state.business_analysis = {
             "metric": "fallback",
             "filters": [],

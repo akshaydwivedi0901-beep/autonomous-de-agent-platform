@@ -61,7 +61,7 @@ def _format_history(history: list) -> str:
 def explain_agent(state: AgentState) -> AgentState:
 
     try:
-        logger.info("🔥 EXPLAIN AGENT START")
+        logger.info(" EXPLAIN AGENT START")
 
         rows = state.rows or []
         rag_context = state.rag_context or ""
@@ -99,7 +99,7 @@ def explain_agent(state: AgentState) -> AgentState:
         state.explanation = state.final_answer
         state.status = "EXPLAINED"
 
-        logger.info("✅ Explanation generated")
+        logger.info(" Explanation generated")
 
         return state
 

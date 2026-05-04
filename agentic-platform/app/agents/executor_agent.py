@@ -8,17 +8,17 @@ logger = logging.getLogger(__name__)
 def executor_agent(state: AgentState):
 
     try:
-        logger.info("🔥 EXECUTOR AGENT START")
+        logger.info(" EXECUTOR AGENT START")
 
         sql = state.validated_sql or state.generated_sql
 
         if not sql:
             raise ValueError("No SQL available for execution")
 
-        # 🔥 REMOVE SEMICOLON
+        #  REMOVE SEMICOLON
         sql = sql.strip().rstrip(";")
 
-        # 🔥 SAFE LIMIT
+        #  SAFE LIMIT
         if "limit" not in sql.lower():
             sql = f"{sql} LIMIT 100"
 
@@ -34,12 +34,12 @@ def executor_agent(state: AgentState):
 
         state.status = "EXECUTED"
 
-        logger.info(f"✅ EXECUTION SUCCESS: rows={state.row_count}")
+        logger.info(f" EXECUTION SUCCESS: rows={state.row_count}")
 
         return state
 
     except Exception as e:
-        logger.exception(f"❌ EXECUTOR AGENT FAILED: {str(e)}")
+        logger.exception(f" EXECUTOR AGENT FAILED: {str(e)}")
 
         state.error = str(e)
         state.status = "EXECUTION_FAILED"

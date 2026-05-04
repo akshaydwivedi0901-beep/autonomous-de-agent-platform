@@ -13,7 +13,7 @@ def governance_agent(state):
 
     risk_score = 0
 
-    # 🚫 Hard-block forbidden keywords
+    #  Hard-block forbidden keywords
     for keyword in FORBIDDEN_KEYWORDS:
         if keyword in sql:
             state.governance_status = "BLOCKED_FORBIDDEN_KEYWORD"
@@ -28,7 +28,7 @@ def governance_agent(state):
 
             return state
 
-    # 🚫 Block DELETE if not allowed
+    #  Block DELETE if not allowed
     if "DELETE" in sql and not policy["allow_delete"]:
         state.governance_status = "BLOCKED_DELETE_NOT_ALLOWED"
         state.status = "BLOCKED"
@@ -41,7 +41,7 @@ def governance_agent(state):
 
         return state
 
-    # 🔍 Risk scoring
+    # Risk scoring
     if "SELECT *" in sql:
         risk_score += 20
 
@@ -58,7 +58,7 @@ def governance_agent(state):
 
     state.risk_score = risk_score
 
-    # 🚫 Block if risk exceeds environment threshold
+    # Block if risk exceeds environment threshold
     if risk_score > policy["max_risk_score"]:
         state.governance_status = "BLOCKED_HIGH_RISK"
         state.status = "BLOCKED"
@@ -72,7 +72,7 @@ def governance_agent(state):
 
         return state
 
-    # ✅ Approved
+    #  Approved
     state.governance_status = "APPROVED"
     state.status = "GOVERNANCE_APPROVED"
 

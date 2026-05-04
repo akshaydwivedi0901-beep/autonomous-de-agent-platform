@@ -22,19 +22,19 @@ class SafeLLM:
 
                 error_msg = str(e)
 
-                # 🔥 Handle rate limit (429)
+                #  Handle rate limit (429)
                 if "429" in error_msg or "rate limit" in error_msg.lower():
                     wait_time = 2 ** attempt
-                    logger.warning(f"⚠️ Rate limited. Retrying in {wait_time}s...")
+                    logger.warning(f" Rate limited. Retrying in {wait_time}s...")
                     time.sleep(wait_time)
                     continue
 
-                # 🔥 Unknown error
-                logger.error(f"❌ LLM ERROR: {error_msg}")
+                #  Unknown error
+                logger.error(f" LLM ERROR: {error_msg}")
                 break
 
-        # 🚨 FINAL FALLBACK (NO EXCEPTION)
-        logger.error("🚨 LLM FAILED AFTER RETRIES — RETURNING FALLBACK")
+        #  FINAL FALLBACK (NO EXCEPTION)
+        logger.error(" LLM FAILED AFTER RETRIES — RETURNING FALLBACK")
 
         class FallbackResponse:
             content = "Unable to process request due to high load. Please try again."
@@ -63,7 +63,7 @@ class LLMRouter:
             temperature=0
         )
 
-        # ✅ Wrap with SafeLLM
+        #  Wrap with SafeLLM
         llm = SafeLLM(base_llm)
 
         cls._cache[model] = llm

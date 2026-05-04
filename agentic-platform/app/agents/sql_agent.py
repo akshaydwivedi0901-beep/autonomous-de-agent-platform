@@ -68,7 +68,7 @@ def _clean_sql(raw: str) -> str:
 def sql_agent(state: AgentState) -> AgentState:
 
     try:
-        logger.info("🔥 SQL AGENT START (LLM-powered)")
+        logger.info(" SQL AGENT START (LLM-powered)")
 
         # =============================
         # FETCH SCHEMA (cached per process via service)
@@ -114,12 +114,12 @@ def sql_agent(state: AgentState) -> AgentState:
         state.generated_sql = sql
         state.status = "SQL_GENERATED"
 
-        logger.info(f"✅ LLM-generated SQL:\n{sql}")
+        logger.info(f" LLM-generated SQL:\n{sql}")
 
         return state
 
     except Exception as e:
-        logger.exception("❌ SQL AGENT FAILED")
+        logger.exception(" SQL AGENT FAILED")
         state.error = str(e)
         state.status = "SQL_FAILED"
         return state
